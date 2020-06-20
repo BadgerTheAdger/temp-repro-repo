@@ -1,0 +1,47 @@
+﻿@page "/hallOfFame"
+
+@using SpeakingClubApps.Data
+@inject HallOfFameService HallOfFameService
+
+<h1>Hall of fame</h1>
+
+@if (people == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <table class="table">
+        <thead>
+        <tr>
+            <th>#</th>
+            <th>real name</th>
+            <th>username</th>
+            <th>visits</th>
+            <th>score</th>
+        </tr>
+        </thead>
+        <tbody>
+        @for (var index = 0; index < people.Length; index++)
+        {
+            var person = people[index];
+            <tr>
+                <td>@( (index + 1).ToString() )</td>
+                <td>@(person.FirstName + " " + person.LastName)</td>
+                <td>@person.UserName</td>
+                <td>@person.Visits.ToString()</td>
+                <td>@person.Score.ToString()</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+@code {
+    private Person[] people;
+
+    protected override async Task OnInitializedAsync()
+    {
+        people = await HallOfFameService.GetPeopleAsync();
+    }
+}

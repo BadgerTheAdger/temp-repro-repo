@@ -1,0 +1,154 @@
+﻿@page "/speakingClub"
+@inject HallOfFameService peopleService
+
+@using SpeakingClubApps.Data
+@using BlazorMedia
+
+<h1>Speaking club session</h1>
+
+@if (!speakingClubActive)
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>username</th>
+                <th>is participating</th>
+            </tr>
+        </thead>
+        <tbody>
+            @for (var index = 0; index < people.Length; index++)
+            {
+                var person = people[index];
+                <tr>
+                    <td>@(person.UserName)</td>
+                    <td><input type="checkbox" @bind="@person.IsParticipating" /></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <input type="text" @bind-value="@TimeProxy" />
+
+    <button @onclick=@StartSpeakingClub>Start Speaking club!</button>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>username</th>
+                <th>remaining time...</th>
+            </tr>
+        </thead>
+        <tbody>
+            @for (var index = 0; index < participants.Length; index++)
+            {
+                var person = participants[index];
+
+                if (person == talkingPerson)
+                {
+                    <tr style="{background-color: #228B22}">
+                        <td>@((index + 1).ToString())</td>
+                        <td>@(person.UserName)</td>
+                        <td>@(remainingTalkTime.ToString())</td>
+                    </tr>
+                }
+                else
+                {
+                    <tr>
+                        <td>@((index + 1).ToString())</td>
+                        <td>@(person.UserName)</td>
+                        <td>-</td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+
+    if (rating == -1)
+    {
+        <select class="form-control" size="10" @bind="rating">
+            <option>1</option>
+            <option>2</option>
+            <option>3</option>
+            <option>4</option>
+            <option>5</option>
+        </select>
+    }
+
+    <VideoMedia OnData="OnDataReceived" Timeslice="100" Width="640" Height="480" RecordAudio="true"></VideoMedia>
+
+    <button @onclick=@StopSpeakingClub>Stop Speaking club!</button>
+}
+
+@functions
+{
+    string TimeProxy { get => timeForSpeech.ToString(); set => TimeSpan.TryParse(value, out timeForSpeech); }
+}
+
+@code {
+    private Person[] people;
+    private Person[] participants;
+    private Person talkingPerson;
+    bool speakingClubActive;
+    int rating;
+    TimeSpan timeForSpeech = TimeSpan.FromMinutes(1);
+    TimeSpan remainingTalkTime;
+
+    protected override async Task OnInitializedAsync()
+    {
+        people = await peopleService.GetPeopleAsync();
+    }
+
+    private void OnDataReceived(byte[] data)
+    {
+        Console.WriteLine(data.Length);
+    }
+
+    private void StartSpeakingClub()
+    {
+        speakingClubActive = true;
+
+        participants = people.Where(i => i.IsParticipating).ToArray();
+
+        var task = StartLoop();
+    }
+
+    private async Task StartLoop()
+    {
+        while (speakingClubActive)
+        {
+            foreach (var participant in participants)
+            {
+                talkingPerson = participant;
+                remainingTalkTime = timeForSpeech;
+                StateHasChanged();
+
+                while (remainingTalkTime > TimeSpan.Zero)
+                {
+                    await Task.Delay(1000);
+                    remainingTalkTime -= TimeSpan.FromSeconds(1);
+                    StateHasChanged();
+                }
+
+                rating = -1;
+                StateHasChanged();
+
+                while (rating == -1)
+                {
+                    await Task.Delay(10);
+                }
+
+                participant.Score += rating * 20;
+            }
+        }
+    }
+
+    private async Task StopSpeakingClub()
+    {
+        await peopleService.UpdateParticipants(participants);
+        speakingClubActive = false;
+        rating = -1;
+    }
+}
